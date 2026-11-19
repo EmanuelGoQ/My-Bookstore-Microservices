@@ -5,6 +5,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.js";
 import { useBook } from "../hooks/useBooks.js";
 import { useCart } from "../hooks/useCart.js";
+import { useAddToWishlist } from "../hooks/useWishlist.js";
+import BookReviews from "../components/BookReviews.jsx";
 import { formatCurrency } from "../utils/currency.js";
 
 const toAddToCartMessage = (requestedQuantity, addedQuantity) => {
@@ -46,6 +48,7 @@ const BookDetail = ({ book }) => {
   const [message, setMessage] = useState(null);
   const { user } = useAuth();
   const { addItem } = useCart();
+  const addToWishlist = useAddToWishlist();
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
@@ -56,6 +59,20 @@ const BookDetail = ({ book }) => {
 
     const addedQuantity = addItem(book, quantity);
     setMessage(toAddToCartMessage(quantity, addedQuantity));
+  };
+
+  const handleAddToWishlist = async () => {
+    if (!user) {
+      navigate("/login", { state: { from: `/book/${book.isbn}` } });
+      return;
+    }
+
+    try {
+      await addToWishlist.mutateAsync(book.id);
+      setMessage({ variant: "success", text: "El libro se agregó a tu lista de deseos." });
+    } catch (error) {
+      setMessage({ variant: "danger", text: error.message });
+    }
   };
 
   return (
@@ -131,9 +148,22 @@ const BookDetail = ({ book }) => {
                 Agregar al carrito
               </Button>
             </ListGroup.Item>
+            <ListGroup.Item>
+              <Button
+                type="button"
+                variant="outline-secondary"
+                className="w-100"
+                disabled={addToWishlist.isPending}
+                onClick={handleAddToWishlist}
+              >
+                ♥ Agregar a lista de deseos
+              </Button>
+            </ListGroup.Item>
           </ListGroup>
         </Col>
       </Row>
+
+      <BookReviews bookId={book.id} isbn={book.isbn} />
     </>
   );
 };

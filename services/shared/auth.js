@@ -48,15 +48,30 @@ export const createAuth = (authConfig) => {
     return { customerId: payload.sub, sessionId: payload.sid };
   };
 
-  // Populates req.auth / req.authState from the session cookie. Never throws.
+  // Extracts the session token from the Authorization: Bearer header (preferred
+  // for cross-site SPA + API on different origins, e.g. Cloudflare Pages front
+  // end calling an HTTP backend) or, as a fallback, from the session cookie.
+  const extractToken = (req) => {
+    const authHeader = req.headers.authorization ?? req.headers.Authorization;
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+      const bearer = authHeader.slice(7).trim();
+      if (bearer) {
+        return bearer;
+      }
+    }
+
+    const cookies = parse(req.headers.cookie ?? "");
+    return cookies[authConfig.cookie.name];
+  };
+
+  // Populates req.auth / req.authState from the bearer token or cookie. Never throws.
   const sessionContext = async (req, res, next) => {
     void res;
 
     req.auth = undefined;
     req.authState = "anonymous";
 
-    const cookies = parse(req.headers.cookie ?? "");
-    const token = cookies[authConfig.cookie.name];
+    const token = extractToken(req);
 
     if (!token) {
       next();

@@ -12,6 +12,7 @@ import ProfileScreen from "./screens/ProfileScreen";
 import CartScreen from "./screens/CartScreen";
 import OrderSuccessScreen from "./screens/OrderSuccessScreen";
 import OrdersScreen from "./screens/OrdersScreen";
+import WishlistScreen from "./screens/WishlistScreen";
 
 const App = () => {
   return (
@@ -28,6 +29,7 @@ const App = () => {
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<ProfileScreen />} />
               <Route path="/cart" element={<CartScreen />} />
+              <Route path="/wishlist" element={<WishlistScreen />} />
               <Route path="/orders" element={<OrdersScreen />} />
               <Route
                 path="/orders/:orderId/success"

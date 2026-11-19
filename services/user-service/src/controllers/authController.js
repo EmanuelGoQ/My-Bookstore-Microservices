@@ -56,13 +56,20 @@ export const createAuthController = ({ customerRepository, createSessionToken })
       resourceId: customer.customer_id,
     });
 
+    // Cookie kept for same-site/local flows; token in the body is what a
+    // cross-site SPA (Cloudflare Pages) uses as a Bearer credential.
     res.cookie(config.auth.cookie.name, token, {
       ...SESSION_COOKIE_OPTIONS,
       maxAge: config.auth.jwt.ttlSeconds * 1000,
     });
 
     disableResponseCaching(res);
-    res.status(200).json({ user: toPublicCustomer(customer) });
+    res.status(200).json({
+      user: toPublicCustomer(customer),
+      token,
+      tokenType: "Bearer",
+      expiresIn: config.auth.jwt.ttlSeconds,
+    });
   };
 
   const getCurrentUser = async (req, res) => {

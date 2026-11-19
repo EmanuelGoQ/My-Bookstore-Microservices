@@ -25,3 +25,18 @@ export const orderEndpoints = Object.freeze({
   detail: (orderId) => `${ordersBasePath}/${encodeURIComponent(orderId)}`,
   create: ordersBasePath,
 });
+
+const wishlistBasePath = `${frontendConfig.apiPrefix}/wishlist`;
+const reviewsBasePath = `${frontendConfig.apiPrefix}/reviews`;
+
+export const wishlistEndpoints = Object.freeze({
+  list: wishlistBasePath,
+  items: `${wishlistBasePath}/items`,
+  item: (bookId) => `${wishlistBasePath}/items/${encodeURIComponent(bookId)}`,
+});
+
+export const reviewEndpoints = Object.freeze({
+  byBook: (bookId) => `${reviewsBasePath}/book/${encodeURIComponent(bookId)}`,
+  create: reviewsBasePath,
+  detail: (reviewId) => `${reviewsBasePath}/${encodeURIComponent(reviewId)}`,
+});

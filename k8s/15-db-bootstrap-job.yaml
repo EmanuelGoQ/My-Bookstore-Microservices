@@ -44,7 +44,7 @@ spec:
               sh /repo/databases/common/rds-bootstrap.sh
           env:
             # Clones the tip of this branch, so it always has rds-bootstrap.sh.
-            - { name: GIT_BRANCH, value: "infra-y-manifiestos" }
+            - { name: GIT_BRANCH, value: "main" }
             - { name: PGHOST, valueFrom: { configMapKeyRef: { name: bookstore-common, key: DB_HOST } } }
             - { name: PGPORT, valueFrom: { configMapKeyRef: { name: bookstore-common, key: DB_PORT } } }
             - { name: PGSSLMODE, value: "require" }

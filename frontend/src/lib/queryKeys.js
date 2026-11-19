@@ -13,3 +13,13 @@ export const orderKeys = Object.freeze({
   list: () => [...orderKeys.all, "list"],
   detail: (orderId) => [...orderKeys.all, "detail", orderId],
 });
+
+export const wishlistKeys = Object.freeze({
+  all: ["wishlist"],
+  list: () => [...wishlistKeys.all, "list"],
+});
+
+export const reviewKeys = Object.freeze({
+  all: ["reviews"],
+  byBook: (bookId) => [...reviewKeys.all, "book", bookId],
+});

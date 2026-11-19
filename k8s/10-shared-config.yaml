@@ -15,10 +15,10 @@ metadata:
 data:
   NODE_ENV: "production"
   API_BASE_PATH: "/api"
-  # Origin(s) allowed by CORS. Set to the public frontend origin (the CDN /
-  # ALB hostname). Comma-separated if several. Update once the ALB host or the
-  # CloudFront domain is known.
-  CORS_ORIGINS: "*"
+  # Origin(s) allowed by CORS: the Cloudflare Pages frontend. Comma-separated
+  # if several. Auth uses Bearer tokens (not cookies), so a specific origin is
+  # all that's needed; "*" is avoided for good practice.
+  CORS_ORIGINS: "https://bookstore-eafit.pages.dev"
   HTTP_TRUST_PROXY_HOPS: "1"
   HTTP_JSON_BODY_LIMIT: "32kb"
 

@@ -1,7 +1,7 @@
 import { Container, Navbar, Nav, NavDropdown, Badge } from "react-bootstrap";
 import { LinkContainer } from "react-router-bootstrap";
 import { useNavigate } from "react-router-dom";
-import { FaShoppingCart, FaUser } from "react-icons/fa";
+import { FaShoppingCart, FaUser, FaHeart } from "react-icons/fa";
 import logo from "../assets/bookstore-logo.svg";
 
 import { useAuth } from "../hooks/useAuth.js";
@@ -40,6 +40,17 @@ const Header = () => {
 
                     <Navbar.Collapse id="basic-navbar-nav">
                         <Nav className="ms-auto align-items-lg-center">
+                            {!isLoading && user && (
+                                <LinkContainer to="/wishlist">
+                                    <Nav.Link
+                                        className="d-flex align-items-center gap-1"
+                                        aria-label="Mi lista de deseos"
+                                    >
+                                        <FaHeart />
+                                    </Nav.Link>
+                                </LinkContainer>
+                            )}
+
                             {!isLoading && user && (
                                 <LinkContainer to="/cart">
                                     <Nav.Link
@@ -84,6 +95,12 @@ const Header = () => {
                                         <LinkContainer to="/orders">
                                             <NavDropdown.Item>
                                                 Mis compras
+                                            </NavDropdown.Item>
+                                        </LinkContainer>
+
+                                        <LinkContainer to="/wishlist">
+                                            <NavDropdown.Item>
+                                                Mi lista de deseos
                                             </NavDropdown.Item>
                                         </LinkContainer>
 
