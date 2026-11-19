@@ -7,6 +7,7 @@ WORKDIR /app
 
 COPY proto ./proto
 COPY services/shared ./services/shared
+RUN cd /app/services/shared && npm install --omit=dev
 
 COPY services/order-service/package.json ./services/order-service/package.json
 WORKDIR /app/services/order-service

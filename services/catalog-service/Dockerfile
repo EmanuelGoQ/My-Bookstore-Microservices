@@ -12,6 +12,8 @@ COPY proto ./proto
 # Shared package first (it is a file: dependency of the service)
 COPY services/shared ./services/shared
 
+RUN cd /app/services/shared && npm install --omit=dev
+
 # Service manifest, install with the shared package linked
 COPY services/catalog-service/package.json ./services/catalog-service/package.json
 WORKDIR /app/services/catalog-service

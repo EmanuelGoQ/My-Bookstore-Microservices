@@ -51,8 +51,32 @@ export default defineConfig(({ command, mode, isPreview }) => {
     config.server = {
       port: devServerPort,
       proxy: {
-        [apiPrefix]: {
-          target: requireEnv(env, "VITE_DEV_API_TARGET"),
+        "/api/books": {
+          target: "http://localhost:5001",
+          changeOrigin: true,
+        },
+        "/api/auth": {
+          target: "http://localhost:5002",
+          changeOrigin: true,
+        },
+        "/api/orders": {
+          target: "http://localhost:5003",
+          changeOrigin: true,
+        },
+        "/api/cart": {
+          target: "http://localhost:5004",
+          changeOrigin: true,
+        },
+        "/api/wishlist": {
+          target: "http://localhost:5005",
+          changeOrigin: true,
+        },
+        "/api/reviews": {
+          target: "http://localhost:5006",
+          changeOrigin: true,
+        },
+        "/api/events": {
+          target: "http://localhost:5001",
           changeOrigin: true,
         },
       },
