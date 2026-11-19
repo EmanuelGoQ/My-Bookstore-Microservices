@@ -13,6 +13,22 @@ source ~/bookstore-env.sh
 export FRONT_ORIGIN=https://bookstore-eafit.pages.dev
 ```
 
+## Vía rápida con scripts (recomendada)
+
+```bash
+aws sts get-caller-identity                       # credenciales del Lab activas
+export AWS_REGION=us-east-1 CLUSTER=bookstore-eks NAMESPACE=bookstore
+bash scripts/infra-up.sh && source ~/bookstore-env.sh   # red + RDS (idempotente)
+eksctl create cluster -f k8s/eksctl-cluster.yaml        # cluster (~20 min)
+aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER"
+bash scripts/secrets-up.sh                               # 3 secrets
+bash scripts/deploy.sh                                   # config+bootstrap+servicios+gateway+fluent-bit
+cloudflared tunnel --url "http://$API_LB"                # HTTPS para el backend
+# -> pon la URL del túnel en frontend/public/runtime-config.js y redeploy a Pages
+```
+
+Los pasos manuales equivalentes quedan documentados abajo por si algo falla.
+
 ## 0. Commit + push de los cambios
 
 Backend, config y frontend cambiaron. Commitea por áreas (sin secretos):

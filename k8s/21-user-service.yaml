@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: user-service
-          image: 905418379975.dkr.ecr.us-east-1.amazonaws.com/bookstore/user-service:3dd6e9a
+          image: 905418379975.dkr.ecr.us-east-1.amazonaws.com/bookstore/user-service:auth2
           ports:
             - { name: http, containerPort: 5002 }
             - { name: grpc, containerPort: 50052 }
