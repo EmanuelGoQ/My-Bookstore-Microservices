@@ -1,5 +1,9 @@
 # Fluent Bit runs as a DaemonSet in the logging namespace, reads every node's
 # container logs, and ships the bookstore clickstream to S3.
+#
+# AWS Academy note: OIDC/IRSA is unavailable, so Fluent Bit uses the default AWS
+# credential chain, which on EKS resolves to the NODE instance role (LabRole).
+# No IRSA annotation on the ServiceAccount.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -10,10 +14,6 @@ kind: ServiceAccount
 metadata:
   name: fluent-bit
   namespace: logging
-  annotations:
-    # IRSA: bind an IAM role that allows s3:PutObject on the target bucket.
-    # Create it with eksctl/IAM and paste the role ARN here.
-    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/bookstore-fluent-bit-s3
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
