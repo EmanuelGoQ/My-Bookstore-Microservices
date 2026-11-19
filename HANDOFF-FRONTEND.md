@@ -1,8 +1,14 @@
-# Handoff para el frontend (Cloudflare Pages)
+# Handoff — proyecto completo (backend + frontend)
 
-Contexto y pasos para que tomes el frontend desde aquí. El backend ya está
-desplegado y funcionando en AWS (EKS + RDS); solo falta desplegar el frontend
-y conectarlo.
+El Lab de AWS se apagó y borró los recursos efímeros (EKS, nodos, LoadBalancer,
+túnel). TODO está automatizado en el repo para volver a levantarlo.
+
+> PARA LEVANTAR TODO DE CERO: sigue `RUNBOOK.md` (en la raíz del repo). Es la
+> guía maestra, con los scripts y los fixes de los problemas que ya resolvimos
+> (nodos reciclados por el Lab, contraseña de RDS, security groups).
+
+Este documento resume la parte del frontend. El backend se levanta con los
+scripts de `scripts/` como explica el RUNBOOK.
 
 ## Qué está hecho (backend, por mi parte)
 
