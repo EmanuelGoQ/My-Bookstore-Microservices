@@ -2,11 +2,11 @@
 // point the SPA at a different backend WITHOUT rebuilding: just edit this file
 // and redeploy it alongside the static assets.
 //
-// Typical use: the Cloudflare Quick Tunnel URL changes on every restart, so
-// after starting cloudflared you only update apiBaseUrl here instead of doing
-// a full `npm run build`.
+// apiBaseUrl must be the HTTPS URL that fronts the backend. Today it is the
+// Cloudflare Quick Tunnel to the EKS LoadBalancer. That URL CHANGES every time
+// the tunnel (or the AWS Lab) is restarted: update it here and redeploy Pages.
 //
 // Leave apiBaseUrl empty ("") to fall back to the build-time VITE_API_BASE_URL.
 window.__BOOKSTORE_CONFIG__ = {
-  apiBaseUrl: "",
+  apiBaseUrl: "https://feeds-belong-distributions-kidney.trycloudflare.com",
 };
