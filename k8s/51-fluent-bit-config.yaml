@@ -34,7 +34,8 @@ data:
         Mem_Buf_Limit    20MB
         Skip_Long_Lines  On
         Refresh_Interval 5
-        DB               /var/log/flb_bookstore.db
+        # Position DB must live on a WRITABLE volume (/var/log is mounted RO).
+        DB               /var/fluent-bit/flb_bookstore.db
 
     # Attach Kubernetes metadata (pod, namespace, labels).
     [FILTER]
