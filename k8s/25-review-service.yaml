@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: review-service
-          image: REGISTRY/review-service:latest
+          image: 905418379975.dkr.ecr.us-east-1.amazonaws.com/bookstore/review-service:3dd6e9a
           ports:
             - { name: http, containerPort: 5006 }
           envFrom:
@@ -27,9 +27,8 @@ spec:
             - { name: REVIEWS_MAX_LIMIT, value: "100" }
             - { name: CATALOG_GRPC_TARGET, value: "catalog-grpc:50051" }
             - { name: USER_GRPC_TARGET, value: "user-grpc:50052" }
-            - { name: DB_PORT, value: "5432" }
+            # DB_HOST and DB_PORT come from the shared ConfigMap (envFrom).
             - { name: DB_NAME, value: "reviews" }
-            - { name: DB_HOST, valueFrom: { secretKeyRef: { name: bookstore-db, key: REVIEWS_DB_HOST } } }
             - { name: DB_USER, valueFrom: { secretKeyRef: { name: bookstore-db, key: REVIEWS_DB_USER } } }
             - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: REVIEWS_DB_PASSWORD } } }
             - { name: AUTH_JWT_SECRET, valueFrom: { secretKeyRef: { name: bookstore-auth, key: AUTH_JWT_SECRET } } }

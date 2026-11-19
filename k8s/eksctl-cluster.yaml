@@ -1,0 +1,58 @@
+# eksctl cluster definition for AWS Academy Learner Lab.
+#
+# Reuses the pre-existing VPC/subnets (created manually in Fase 3) and the
+# pre-existing LabRole for BOTH the cluster service role and the node group
+# instance role, because Academy does not allow creating new IAM roles.
+#
+# Create with:
+#   eksctl create cluster -f k8s/eksctl-cluster.yaml
+#
+# The ARNs/IDs below are specific to this account/lab. If the lab is recycled
+# and IDs change, regenerate this file from ~/bookstore-env.sh.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: bookstore-eks
+  region: us-east-1
+  version: "1.31"
+
+# Keep classic managed node groups (not EKS Auto Mode).
+autoModeConfig:
+  enabled: false
+
+# Reuse the manually-created VPC and subnets (do NOT let eksctl create a VPC).
+vpc:
+  id: vpc-08ff704e7e0a404f1
+  subnets:
+    public:
+      us-east-1a: { id: subnet-0e7f164785720d885 }
+      us-east-1b: { id: subnet-07bd39009d1cebfe8 }
+    private:
+      us-east-1a: { id: subnet-0023ada8a4dfee97c }
+      us-east-1b: { id: subnet-007f0c9db6b930815 }
+
+# Academy: the cluster uses the existing LabRole as its service role.
+# OIDC/IRSA is DISABLED: Academy blocks iam:CreateOpenIDConnectProvider (403).
+# Consequence: the AWS Load Balancer Controller (which needs IRSA) is not used.
+# Fase 7 exposes the API with a Service type: LoadBalancer instead (handled by
+# the in-tree cloud controller via LabRole, no OIDC required).
+iam:
+  serviceRoleARN: arn:aws:iam::905418379975:role/LabRole
+  withOIDC: false
+
+managedNodeGroups:
+  - name: bookstore-nodes
+    instanceType: t3.medium
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    # Nodes live in the private subnets; egress is via the NAT gateway.
+    privateNetworking: true
+    # Academy: reuse LabRole for the node instance role; do not create one.
+    iam:
+      instanceRoleARN: arn:aws:iam::905418379975:role/LabRole
+    labels:
+      role: bookstore-worker
+    tags:
+      Project: bookstore
