@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: bookstore
+  labels: { app: catalog-service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: catalog-service }
+  template:
+    metadata:
+      labels: { app: catalog-service }
+    spec:
+      containers:
+        - name: catalog-service
+          # Replace with your pushed image (e.g. ECR repo URL + tag).
+          image: REGISTRY/catalog-service:latest
+          ports:
+            - { name: http, containerPort: 5001 }
+            - { name: grpc, containerPort: 50051 }
+          envFrom:
+            - configMapRef: { name: bookstore-common }
+          env:
+            - { name: SERVICE_NAME, value: "catalog-service" }
+            - { name: PORT, value: "5001" }
+            - { name: GRPC_PORT, value: "50051" }
+            - { name: BOOKS_DEFAULT_LIMIT, value: "24" }
+            - { name: BOOKS_MAX_LIMIT, value: "100" }
+            - { name: DB_PORT, value: "5432" }
+            - { name: DB_NAME, value: "catalog" }
+            - { name: DB_HOST, valueFrom: { secretKeyRef: { name: bookstore-db, key: CATALOG_DB_HOST } } }
+            - { name: DB_USER, valueFrom: { secretKeyRef: { name: bookstore-db, key: CATALOG_DB_USER } } }
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: CATALOG_DB_PASSWORD } } }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }
+---
+# HTTP service, targeted by the ALB Ingress.
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: bookstore
+  labels: { app: catalog-service }
+spec:
+  selector: { app: catalog-service }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+# Headless/ClusterIP gRPC service, consumed in-cluster by order/cart/wishlist/review.
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-grpc
+  namespace: bookstore
+  labels: { app: catalog-service }
+spec:
+  selector: { app: catalog-service }
+  ports:
+    - { name: grpc, port: 50051, targetPort: grpc }

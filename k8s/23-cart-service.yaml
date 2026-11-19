@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-service
+  namespace: bookstore
+  labels: { app: cart-service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: cart-service }
+  template:
+    metadata:
+      labels: { app: cart-service }
+    spec:
+      containers:
+        - name: cart-service
+          image: REGISTRY/cart-service:latest
+          ports:
+            - { name: http, containerPort: 5004 }
+          envFrom:
+            - configMapRef: { name: bookstore-common }
+          env:
+            - { name: SERVICE_NAME, value: "cart-service" }
+            - { name: PORT, value: "5004" }
+            - { name: CART_MAX_QUANTITY_PER_ITEM, value: "1000" }
+            - { name: CATALOG_GRPC_TARGET, value: "catalog-grpc:50051" }
+            - { name: DB_PORT, value: "5432" }
+            - { name: DB_NAME, value: "carts" }
+            - { name: DB_HOST, valueFrom: { secretKeyRef: { name: bookstore-db, key: CARTS_DB_HOST } } }
+            - { name: DB_USER, valueFrom: { secretKeyRef: { name: bookstore-db, key: CARTS_DB_USER } } }
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: CARTS_DB_PASSWORD } } }
+            - { name: AUTH_JWT_SECRET, valueFrom: { secretKeyRef: { name: bookstore-auth, key: AUTH_JWT_SECRET } } }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-service
+  namespace: bookstore
+  labels: { app: cart-service }
+spec:
+  selector: { app: cart-service }
+  ports:
+    - { name: http, port: 80, targetPort: http }

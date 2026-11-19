@@ -1,0 +1,83 @@
+# Fluent Bit configuration. The pipeline:
+#   1. tail /var/log/containers of bookstore pods (the Kubernetes container
+#      runtime writes each pod's stdout/stderr here).
+#   2. the container runtime wraps each line as JSON {log, stream, time}; the
+#      cri/docker multiline parser unwraps the original application line into
+#      the `log` field.
+#   3. a clickstream parser matches the NCSA-combined access line and promotes
+#      its fields (ip, user, request, status, context, ...). Operational JSON
+#      logger lines do NOT match and are dropped by the `grep` filter.
+#   4. matched clickstream records are shipped to S3 as newline-delimited JSON.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: logging
+  labels: { app: fluent-bit }
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush            5
+        Daemon           Off
+        Log_Level        info
+        Parsers_File     parsers.conf
+        HTTP_Server      On
+        HTTP_Listen      0.0.0.0
+        HTTP_Port        2020
+
+    [INPUT]
+        Name             tail
+        Tag              bookstore.*
+        # Only the bookstore namespace pods. Adjust if the runtime path differs.
+        Path             /var/log/containers/*_bookstore_*.log
+        multiline.parser cri
+        Mem_Buf_Limit    20MB
+        Skip_Long_Lines  On
+        Refresh_Interval 5
+        DB               /var/log/flb_bookstore.db
+
+    # Attach Kubernetes metadata (pod, namespace, labels).
+    [FILTER]
+        Name             kubernetes
+        Match            bookstore.*
+        Kube_Tag_Prefix  bookstore.var.log.containers.
+        Merge_Log        Off
+        Keep_Log         On
+
+    # Parse the application line (the `log` field) as an NCSA-combined
+    # clickstream record. Non-matching lines keep no `clickstream_ip` key.
+    [FILTER]
+        Name             parser
+        Match            bookstore.*
+        Key_Name         log
+        Parser           clickstream
+        Reserve_Data     On
+
+    # Keep only lines that actually parsed as a clickstream access line.
+    [FILTER]
+        Name             grep
+        Match            bookstore.*
+        Regex            clickstream_ip .+
+
+    [OUTPUT]
+        Name             s3
+        Match            bookstore.*
+        bucket           ${CLICKSTREAM_S3_BUCKET}
+        region           ${AWS_REGION}
+        # Partition by date for easy querying (Athena/Glue friendly).
+        s3_key_format    /clickstream/year=%Y/month=%m/day=%d/hour=%H/$UUID.jsonl
+        total_file_size  50M
+        upload_timeout   5m
+        use_put_object   On
+        json_date_key    false
+
+  parsers.conf: |
+    # NCSA/Apache combined line + trailing quoted "context" section emitted by
+    # the shared accessLogger. Field names mirror the clickstream schema.
+    [PARSER]
+        Name        clickstream
+        Format      regex
+        Regex       ^(?<clickstream_ip>[^ ]+) [^ ]+ (?<remote_user>[^ ]+) \[(?<time>[^\]]+)\] "(?<request>[^"]*)" (?<status>[^ ]+) (?<bytes>[^ ]+) "(?<referer>[^"]*)" "(?<agent>[^"]*)" "(?<context>[^"]*)"$
+        Time_Key    time
+        Time_Format %d/%b/%Y:%H:%M:%S %z
+        Time_Keep   On

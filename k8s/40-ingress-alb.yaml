@@ -1,0 +1,57 @@
+# AWS ALB Ingress. Requires the AWS Load Balancer Controller installed in the
+# cluster. Each API path prefix is routed to its own service; everything else
+# falls through to the frontend SPA.
+#
+# Path ownership:
+#   /api/auth      -> user-service
+#   /api/books     -> catalog-service
+#   /api/cart      -> cart-service
+#   /api/orders    -> order-service
+#   /api/reviews   -> review-service
+#   /api/wishlist  -> wishlist-service
+#   /api/events    -> catalog-service (client behavior events sink; any service
+#                     works since the event only needs to become a log line)
+#   /              -> frontend
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bookstore
+  namespace: bookstore
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    # Terminate TLS at the ALB with an ACM certificate (set your ARN):
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/ID
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+spec:
+  ingressClassName: alb
+  rules:
+    - host: bookstore.example.com
+      http:
+        paths:
+          - path: /api/auth
+            pathType: Prefix
+            backend: { service: { name: user-service, port: { number: 80 } } }
+          - path: /api/books
+            pathType: Prefix
+            backend: { service: { name: catalog-service, port: { number: 80 } } }
+          - path: /api/cart
+            pathType: Prefix
+            backend: { service: { name: cart-service, port: { number: 80 } } }
+          - path: /api/orders
+            pathType: Prefix
+            backend: { service: { name: order-service, port: { number: 80 } } }
+          - path: /api/reviews
+            pathType: Prefix
+            backend: { service: { name: review-service, port: { number: 80 } } }
+          - path: /api/wishlist
+            pathType: Prefix
+            backend: { service: { name: wishlist-service, port: { number: 80 } } }
+          - path: /api/events
+            pathType: Prefix
+            backend: { service: { name: catalog-service, port: { number: 80 } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: frontend, port: { number: 80 } } }

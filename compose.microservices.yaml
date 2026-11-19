@@ -1,0 +1,182 @@
+# Local development topology for the microservices split. Runs one PostgreSQL
+# instance hosting six independent databases (database-per-service is preserved
+# logically: each service connects only to its own database with its own role),
+# all six services with their gRPC wiring, and the frontend.
+#
+#   docker compose -f compose.microservices.yaml up --build
+#
+# In EKS the databases become separate RDS instances and the services are
+# Deployments behind the ALB Ingress (see k8s/).
+
+name: bookstore-microservices
+
+x-service-base: &service-base
+  restart: unless-stopped
+  init: true
+  networks: [back-tier]
+
+x-db-env: &db-env
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: admin
+  DB_PASSWORD: admin
+  DB_SSL: "false"
+  DB_SSL_REJECT_UNAUTHORIZED: "false"
+  DB_POOL_MAX: "10"
+  DB_IDLE_TIMEOUT_MS: "30000"
+  DB_CONNECTION_TIMEOUT_MS: "5000"
+
+x-http-env: &http-env
+  NODE_ENV: development
+  API_BASE_PATH: /api
+  CORS_ORIGINS: http://localhost:3000
+  HTTP_TRUST_PROXY_HOPS: "1"
+  HTTP_JSON_BODY_LIMIT: 32kb
+  ACCESS_LOG_ENABLED: "true"
+  ACCESS_LOG_EXCLUDE_PATHS: /health
+  ACCESS_LOG_MAX_FIELD_LENGTH: "2048"
+  ACCESS_LOG_REQUEST_ID_HEADER: X-Request-Id
+  CLICKSTREAM_FILE_ENABLED: "false"
+  CLICKSTREAM_FILE_PATH: /usr/src/app/logs/clickstream.log
+
+x-auth-env: &auth-env
+  AUTH_JWT_SECRET: local_development_secret_at_least_32_chars_long
+  AUTH_JWT_ALGORITHM: HS256
+  AUTH_JWT_ISSUER: bookstore-api
+  AUTH_JWT_AUDIENCE: bookstore-web
+  AUTH_TOKEN_TTL_SECONDS: "28800"
+  AUTH_COOKIE_NAME: bookstore_session
+  AUTH_COOKIE_SECURE: "false"
+  AUTH_COOKIE_SAME_SITE: lax
+  AUTH_COOKIE_PATH: /api
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: postgres
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Creates the six databases on first boot.
+      - ./databases/common/init-databases.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [back-tier]
+
+  # One-shot: applies every service schema + seed after the DB is healthy.
+  db-bootstrap:
+    image: postgres:16-alpine
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: admin
+      PGPASSWORD: admin
+    volumes:
+      - ./databases:/databases:ro
+    entrypoint: ["/bin/sh", "/databases/common/apply-all.sh"]
+    networks: [back-tier]
+
+  catalog-service:
+    <<: *service-base
+    build: { context: ., dockerfile: services/catalog-service/Dockerfile }
+    environment:
+      <<: [*http-env, *db-env]
+      SERVICE_NAME: catalog-service
+      PORT: "5001"
+      GRPC_HOST: 0.0.0.0
+      GRPC_PORT: "50051"
+      BOOKS_DEFAULT_LIMIT: "24"
+      BOOKS_MAX_LIMIT: "100"
+      DB_NAME: catalog
+    ports: ["5001:5001"]
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+
+  user-service:
+    <<: *service-base
+    build: { context: ., dockerfile: services/user-service/Dockerfile }
+    environment:
+      <<: [*http-env, *db-env, *auth-env]
+      SERVICE_NAME: user-service
+      PORT: "5002"
+      GRPC_HOST: 0.0.0.0
+      GRPC_PORT: "50052"
+      DB_NAME: users
+    ports: ["5002:5002"]
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+
+  order-service:
+    <<: *service-base
+    build: { context: ., dockerfile: services/order-service/Dockerfile }
+    environment:
+      <<: [*http-env, *db-env, *auth-env]
+      SERVICE_NAME: order-service
+      PORT: "5003"
+      ORDERS_MAX_DISTINCT_ITEMS: "100"
+      ORDERS_MAX_QUANTITY_PER_ITEM: "1000"
+      CATALOG_GRPC_TARGET: catalog-service:50051
+      USER_GRPC_TARGET: user-service:50052
+      DB_NAME: orders
+    ports: ["5003:5003"]
+    depends_on: [catalog-service, user-service]
+
+  cart-service:
+    <<: *service-base
+    build: { context: ., dockerfile: services/cart-service/Dockerfile }
+    environment:
+      <<: [*http-env, *db-env, *auth-env]
+      SERVICE_NAME: cart-service
+      PORT: "5004"
+      CART_MAX_QUANTITY_PER_ITEM: "1000"
+      CATALOG_GRPC_TARGET: catalog-service:50051
+      DB_NAME: carts
+    ports: ["5004:5004"]
+    depends_on: [catalog-service]
+
+  wishlist-service:
+    <<: *service-base
+    build: { context: ., dockerfile: services/wishlist-service/Dockerfile }
+    environment:
+      <<: [*http-env, *db-env, *auth-env]
+      SERVICE_NAME: wishlist-service
+      PORT: "5005"
+      CATALOG_GRPC_TARGET: catalog-service:50051
+      DB_NAME: wishlists
+    ports: ["5005:5005"]
+    depends_on: [catalog-service]
+
+  review-service:
+    <<: *service-base
+    build: { context: ., dockerfile: services/review-service/Dockerfile }
+    environment:
+      <<: [*http-env, *db-env, *auth-env]
+      SERVICE_NAME: review-service
+      PORT: "5006"
+      REVIEWS_MAX_BODY_LENGTH: "4000"
+      REVIEWS_DEFAULT_LIMIT: "20"
+      REVIEWS_MAX_LIMIT: "100"
+      CATALOG_GRPC_TARGET: catalog-service:50051
+      USER_GRPC_TARGET: user-service:50052
+      DB_NAME: reviews
+    ports: ["5006:5006"]
+    depends_on: [catalog-service, user-service]
+
+volumes:
+  postgres_data:
+
+networks:
+  back-tier:

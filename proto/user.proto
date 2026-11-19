@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package bookstore.user.v1;
+
+// User gRPC API consumed by order-service (validate the customer still exists)
+// and review-service (attach the reviewer's display name to a review).
+service UserService {
+  rpc GetCustomer(GetCustomerRequest) returns (GetCustomerResponse);
+}
+
+message Customer {
+  string customer_id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string email = 4;
+  string city = 5;
+  string country = 6;
+}
+
+message GetCustomerRequest {
+  string customer_id = 1;
+}
+
+message GetCustomerResponse {
+  bool found = 1;
+  Customer customer = 2;
+}

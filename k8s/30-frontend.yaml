@@ -1,0 +1,47 @@
+# Frontend SPA (Nginx). In EKS the ALB Ingress owns the /api/* fan-out to each
+# microservice, so the frontend container only serves static assets. Build the
+# image with VITE_API_PREFIX=/api and VITE_API_BASE_URL pointing at the ALB host
+# so the browser calls the same origin and the ALB routes by path.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: bookstore
+  labels: { app: frontend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: frontend }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: REGISTRY/bookstore-frontend:latest
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: NGINX_PORT, value: "8080" }
+            # The pod-local Nginx no longer proxies the API; the ALB does. These
+            # keep the existing template render valid (proxy block unused).
+            - { name: API_PROXY_PREFIX, value: "/__unused" }
+            - { name: PROXY_PASS, value: "http://127.0.0.1:8080" }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "25m", memory: "64Mi" }
+            limits: { cpu: "250m", memory: "128Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: bookstore
+  labels: { app: frontend }
+spec:
+  selector: { app: frontend }
+  ports:
+    - { name: http, port: 80, targetPort: http }

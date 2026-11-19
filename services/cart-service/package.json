@@ -1,0 +1,21 @@
+{
+  "name": "cart-service",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/server.js",
+  "description": "BookStore cart microservice: persistent per-customer cart, gRPC client to catalog",
+  "license": "MIT",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@bookstore/shared": "file:../shared",
+    "cors": "2.8.5",
+    "dotenv": "17.2.3",
+    "express": "5.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

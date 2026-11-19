@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package bookstore.catalog.v1;
+
+// Catalog gRPC API consumed by order-service, cart-service, wishlist-service
+// and review-service to resolve book existence, display fields and price,
+// and (for order-service) to apply a best-effort stock decrement.
+service CatalogService {
+  // Resolve a set of books by id. Missing ids are simply absent from the
+  // response, so callers can detect unavailable books by comparing counts.
+  rpc GetBooks(GetBooksRequest) returns (GetBooksResponse);
+
+  // Resolve a single book by id.
+  rpc GetBook(GetBookRequest) returns (GetBookResponse);
+
+  // Best-effort stock decrement used at checkout (Option B: no distributed
+  // transaction). Each line is applied with a conditional UPDATE; a line whose
+  // stock is insufficient is reported in `failures` and left unchanged.
+  rpc DecreaseStock(DecreaseStockRequest) returns (DecreaseStockResponse);
+}
+
+message Book {
+  string book_id = 1;
+  string isbn = 2;
+  string title = 3;
+  string author = 4;
+  string price = 5;   // NUMERIC serialized as a string to avoid float loss
+  int32 stock = 6;
+}
+
+message GetBooksRequest {
+  repeated string book_ids = 1;
+}
+
+message GetBooksResponse {
+  repeated Book books = 1;
+}
+
+message GetBookRequest {
+  string book_id = 1;
+}
+
+message GetBookResponse {
+  bool found = 1;
+  Book book = 2;
+}
+
+message StockLine {
+  string book_id = 1;
+  int32 quantity = 2;
+}
+
+message DecreaseStockRequest {
+  repeated StockLine lines = 1;
+}
+
+message StockFailure {
+  string book_id = 1;
+  string reason = 2;   // e.g. "INSUFFICIENT_STOCK" or "BOOK_UNAVAILABLE"
+}
+
+message DecreaseStockResponse {
+  bool applied = 1;                    // true if every line succeeded
+  repeated StockFailure failures = 2;  // non-empty when applied == false
+}
