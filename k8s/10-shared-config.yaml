@@ -1,6 +1,12 @@
 # Shared, non-secret configuration common to every service. Per-service values
 # (SERVICE_NAME, PORT, DB_NAME, gRPC targets, limits) are set inline on each
-# Deployment. Secrets (JWT secret, DB passwords) live in Secret objects.
+# Deployment. Secrets (JWT secret, DB credentials) live in Secret objects and
+# are created OUT OF GIT (see k8s/README-secrets.md), never committed.
+#
+# Database topology: ONE RDS PostgreSQL instance hosting six logical databases
+# (catalog, users, orders, carts, wishlists, reviews), each owned by its own
+# least-privilege role. Every service therefore shares DB_HOST/DB_PORT and
+# differs only in DB_NAME (set per Deployment) and its DB_USER/DB_PASSWORD.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,8 +15,10 @@ metadata:
 data:
   NODE_ENV: "production"
   API_BASE_PATH: "/api"
-  # The browser reaches every service through the ALB on one origin, set here.
-  CORS_ORIGINS: "https://bookstore.example.com"
+  # Origin(s) allowed by CORS. Set to the public frontend origin (the CDN /
+  # ALB hostname). Comma-separated if several. Update once the ALB host or the
+  # CloudFront domain is known.
+  CORS_ORIGINS: "*"
   HTTP_TRUST_PROXY_HOPS: "1"
   HTTP_JSON_BODY_LIMIT: "32kb"
 
@@ -19,10 +27,12 @@ data:
   ACCESS_LOG_MAX_FIELD_LENGTH: "2048"
   ACCESS_LOG_REQUEST_ID_HEADER: "X-Request-Id"
   # Clickstream goes to stdout; the Fluent Bit DaemonSet tails the pod logs.
-  # The in-app file sink stays disabled in EKS.
   CLICKSTREAM_FILE_ENABLED: "false"
   CLICKSTREAM_FILE_PATH: "/usr/src/app/logs/clickstream.log"
 
+  # Shared RDS endpoint (same instance for all six databases).
+  DB_HOST: "bookstore-postgres.cr4ikmasytby.us-east-1.rds.amazonaws.com"
+  DB_PORT: "5432"
   DB_SSL: "true"
   DB_SSL_REJECT_UNAUTHORIZED: "false"
   DB_POOL_MAX: "10"
@@ -37,49 +47,7 @@ data:
   AUTH_JWT_AUDIENCE: "bookstore-web"
   AUTH_TOKEN_TTL_SECONDS: "28800"
   AUTH_COOKIE_NAME: "bookstore_session"
-  AUTH_COOKIE_SECURE: "true"
+  # Set to "false" while the ALB is plain HTTP; "true" once HTTPS is terminated.
+  AUTH_COOKIE_SECURE: "false"
   AUTH_COOKIE_SAME_SITE: "lax"
   AUTH_COOKIE_PATH: "/api"
----
-# Secret template. In a real EKS cluster prefer External Secrets / SSM / Secrets
-# Manager over committing values. Values here are placeholders.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: bookstore-auth
-  namespace: bookstore
-type: Opaque
-stringData:
-  AUTH_JWT_SECRET: "replace_this_with_at_least_32_random_characters_in_cluster"
----
-# Per-service database credentials. One key pair per service database.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: bookstore-db
-  namespace: bookstore
-type: Opaque
-stringData:
-  CATALOG_DB_HOST: "catalog-db.your-rds-endpoint.amazonaws.com"
-  CATALOG_DB_USER: "catalog_app"
-  CATALOG_DB_PASSWORD: "change_me"
-
-  USERS_DB_HOST: "users-db.your-rds-endpoint.amazonaws.com"
-  USERS_DB_USER: "user_app"
-  USERS_DB_PASSWORD: "change_me"
-
-  ORDERS_DB_HOST: "orders-db.your-rds-endpoint.amazonaws.com"
-  ORDERS_DB_USER: "order_app"
-  ORDERS_DB_PASSWORD: "change_me"
-
-  CARTS_DB_HOST: "carts-db.your-rds-endpoint.amazonaws.com"
-  CARTS_DB_USER: "cart_app"
-  CARTS_DB_PASSWORD: "change_me"
-
-  REVIEWS_DB_HOST: "reviews-db.your-rds-endpoint.amazonaws.com"
-  REVIEWS_DB_USER: "review_app"
-  REVIEWS_DB_PASSWORD: "change_me"
-
-  WISHLISTS_DB_HOST: "wishlists-db.your-rds-endpoint.amazonaws.com"
-  WISHLISTS_DB_USER: "wishlist_app"
-  WISHLISTS_DB_PASSWORD: "change_me"

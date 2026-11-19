@@ -1,0 +1,58 @@
+# One-shot Job that initializes RDS from inside the cluster (the only place
+# with network access to the private RDS instance). It clones the repo at the
+# deployed commit, then runs databases/common/rds-bootstrap.sh which creates the
+# six databases, the six least-privilege roles, applies schemas + seeds, and
+# grants privileges.
+#
+# Prerequisites (create before applying this Job):
+#   - ConfigMap  bookstore-common  (provides DB_HOST, DB_PORT)
+#   - Secret     bookstore-db      (provides the six *_DB_PASSWORD values)
+#   - Secret     bookstore-rds-admin  (provides the RDS master password), create with:
+#       kubectl create secret generic bookstore-rds-admin -n "$NAMESPACE" \
+#         --from-literal=RDS_MASTER_USER=bookstore_admin \
+#         --from-literal=RDS_MASTER_PASSWORD="$RDS_MASTER_PW"
+#
+# Apply, then watch:
+#   kubectl apply -f k8s/15-db-bootstrap-job.yaml
+#   kubectl logs -f job/db-bootstrap -n bookstore
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-bootstrap
+  namespace: bookstore
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels: { app: db-bootstrap }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bootstrap
+          # Lightweight image with git + psql available via apk.
+          image: alpine:3.20
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              apk add --no-cache git postgresql16-client >/dev/null
+              rm -rf /repo
+              git clone --depth 1 --branch "$GIT_BRANCH" \
+                https://github.com/EmanuelGoQ/My-Bookstore-Microservices.git /repo
+              export DB_DIR=/repo/databases
+              sh /repo/databases/common/rds-bootstrap.sh
+          env:
+            # Clones the tip of this branch, so it always has rds-bootstrap.sh.
+            - { name: GIT_BRANCH, value: "infra-y-manifiestos" }
+            - { name: PGHOST, valueFrom: { configMapKeyRef: { name: bookstore-common, key: DB_HOST } } }
+            - { name: PGPORT, valueFrom: { configMapKeyRef: { name: bookstore-common, key: DB_PORT } } }
+            - { name: PGSSLMODE, value: "require" }
+            - { name: PGUSER, valueFrom: { secretKeyRef: { name: bookstore-rds-admin, key: RDS_MASTER_USER } } }
+            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: bookstore-rds-admin, key: RDS_MASTER_PASSWORD } } }
+            - { name: CATALOG_DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: CATALOG_DB_PASSWORD } } }
+            - { name: USERS_DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: USERS_DB_PASSWORD } } }
+            - { name: ORDERS_DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: ORDERS_DB_PASSWORD } } }
+            - { name: CARTS_DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: CARTS_DB_PASSWORD } } }
+            - { name: WISHLISTS_DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: WISHLISTS_DB_PASSWORD } } }
+            - { name: REVIEWS_DB_PASSWORD, valueFrom: { secretKeyRef: { name: bookstore-db, key: REVIEWS_DB_PASSWORD } } }

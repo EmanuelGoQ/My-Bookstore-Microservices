@@ -1,0 +1,114 @@
+# Public API gateway for EKS when the ALB Ingress path is unavailable (AWS
+# Academy blocks the OIDC provider that the AWS Load Balancer Controller needs).
+#
+# An in-cluster Nginx fans out /api/<domain> to each ClusterIP Service by
+# Kubernetes DNS, and is exposed with a single Service type: LoadBalancer
+# (provisioned by the in-tree cloud controller via LabRole, no OIDC required).
+# This yields ONE public hostname that routes by path, mirroring the ALB.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-nginx
+  namespace: bookstore
+data:
+  nginx.conf: |
+    worker_processes auto;
+    events { worker_connections 1024; }
+    http {
+      # Kubernetes DNS resolver, so upstreams resolve at request time and the
+      # gateway starts even if a Service is briefly unavailable.
+      resolver kube-dns.kube-system.svc.cluster.local valid=10s;
+
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+
+      server {
+        listen 8080;
+
+        location /healthz { return 200 'ok'; add_header Content-Type text/plain; }
+
+        location /api/auth {
+          set $u http://user-service.bookstore.svc.cluster.local;
+          proxy_pass $u;
+        }
+        location /api/books {
+          set $u http://catalog-service.bookstore.svc.cluster.local;
+          proxy_pass $u;
+        }
+        location /api/events {
+          set $u http://catalog-service.bookstore.svc.cluster.local;
+          proxy_pass $u;
+        }
+        location /api/cart {
+          set $u http://cart-service.bookstore.svc.cluster.local;
+          proxy_pass $u;
+        }
+        location /api/orders {
+          set $u http://order-service.bookstore.svc.cluster.local;
+          proxy_pass $u;
+        }
+        location /api/reviews {
+          set $u http://review-service.bookstore.svc.cluster.local;
+          proxy_pass $u;
+        }
+        location /api/wishlist {
+          set $u http://wishlist-service.bookstore.svc.cluster.local;
+          proxy_pass $u;
+        }
+
+        # Default: simple landing so the LB health check on "/" succeeds.
+        location / { return 200 'bookstore api gateway'; add_header Content-Type text/plain; }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: bookstore
+  labels: { app: api-gateway }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: api-gateway }
+  template:
+    metadata:
+      labels: { app: api-gateway }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - { name: http, containerPort: 8080 }
+          volumeMounts:
+            - { name: config, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "25m", memory: "32Mi" }
+            limits: { cpu: "200m", memory: "128Mi" }
+      volumes:
+        - name: config
+          configMap: { name: api-gateway-nginx }
+---
+# The single public entry point. type: LoadBalancer provisions a Classic LB.
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: bookstore
+  labels: { app: api-gateway }
+  annotations:
+    # Internet-facing Classic LB. (NLB would need the LB controller; CLB works
+    # with the in-tree controller and LabRole.)
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+spec:
+  type: LoadBalancer
+  selector: { app: api-gateway }
+  ports:
+    - { name: http, port: 80, targetPort: http }

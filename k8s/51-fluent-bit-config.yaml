@@ -34,7 +34,8 @@ data:
         Mem_Buf_Limit    20MB
         Skip_Long_Lines  On
         Refresh_Interval 5
-        DB               /var/log/flb_bookstore.db
+        # Position DB must live on a WRITABLE volume (/var/log is mounted RO).
+        DB               /var/fluent-bit/flb_bookstore.db
 
     # Attach Kubernetes metadata (pod, namespace, labels).
     [FILTER]
@@ -66,10 +67,12 @@ data:
         region           ${AWS_REGION}
         # Partition by date for easy querying (Athena/Glue friendly).
         s3_key_format    /clickstream/year=%Y/month=%m/day=%d/hour=%H/$UUID.jsonl
-        total_file_size  50M
-        upload_timeout   5m
+        # Small files + short timeout so records land quickly in a demo.
+        total_file_size  10M
+        upload_timeout   1m
         use_put_object   On
-        json_date_key    false
+        store_dir        /var/fluent-bit/s3
+        store_dir_limit_size 100M
 
   parsers.conf: |
     # NCSA/Apache combined line + trailing quoted "context" section emitted by
