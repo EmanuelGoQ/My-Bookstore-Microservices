@@ -2,7 +2,7 @@
 
 Aplicación de referencia para el caso longitudinal del curso
 **Cloud Computing**.
-
+.
 Este repositorio contiene una versión funcional de la plataforma operacional
 de BookStore Co. y será utilizado durante diferentes actividades y laboratorios
 del curso.
